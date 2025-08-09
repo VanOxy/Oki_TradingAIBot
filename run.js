@@ -1,16 +1,28 @@
 require('dotenv').config();
 const fs = require('fs');
 const input = require("input");
+//const mongoose = require('mongoose');
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
+const { NewMessage } = require("telegram/events");
+const { parseNotification } = require('./tools/parsing');
 
-// GLOBALS
+// ====== MONGOOSE ======
+// const MessageSchema = new mongoose.Schema({
+//   chatId: String,
+//   chatName: String,
+//   messageId: Number,
+//   text: String,
+//   date: Date
+// });
+// const MessageModel = mongoose.model("Message", MessageSchema);
+
+// ====== GLOBALS ======
 const apiId = parseInt(process.env.API_ID); // из твоего приложения Telegram
 const apiHash = process.env.API_HASH;       // из того же приложения
 const sessionFile = process.env.SESSION;
-
-let stringSession;
 let isNewSession = false;
+let stringSession;
 
 // Попытка загрузить сессию из файла
 if (fs.existsSync(sessionFile)) {
@@ -27,8 +39,20 @@ if (fs.existsSync(sessionFile)) {
 const client = new TelegramClient(stringSession, apiId, apiHash, {
     connectionRetries: 5,
 });
+if (!client) {
+  console.error("❌ Error on client creation");
+  return;
+}
 
+// ====== MAIN ======
 (async () => {
+  // Подключение к MongoDB
+  // await mongoose.connect(process.env.MONGO_URI, { 
+  //   useNewUrlParser: true,
+  //   useUnifiedTopology: true
+  // });
+  // console.log("✅ Подключено к MongoDB");
+
   console.log("⚙️ Запускаем Telegram client...");
   // connection
   if(isNewSession){ // если сессии нет — спрашиваем данные и авторизуемся
@@ -41,26 +65,45 @@ const client = new TelegramClient(stringSession, apiId, apiHash, {
     });
     const savedSession = client.session.save();
     console.log("✅ Успешный вход!");
-    console.log("💾 Ваш session string:", savedSession);
     fs.writeFileSync(sessionFile, JSON.stringify({session: savedSession}, null, 2));
   } else { // подключаемся без логина
     await client.connect(); 
     console.log("🔌 Подключились по сохранённой сессии.");
   }
 
-  const dialogs = await client.getDialogs();
 
   try {
-    const OIbot = dialogs.find(dialog => dialog.name === process.env.OI_BOT_NAME);
-    if (!OIbot) {
+    const dialogs = await client.getDialogs();
+    const OIbotDialog = dialogs.find(dialog => dialog.name === process.env.OI_BOT_NAME);
+    if (!OIbotDialog) {
       console.error("❌ Канал не найден:", process.env.OI_BOT_NAME);
       return;
     }
 
-    const messages = await client.getMessages(OIbot.id, { limit: 10 });
-    for (const message of messages) {
-      console.log("💬", message.message);
-    }
+    client.addEventHandler(async (event) => {
+      const msg = event.message;
+      if (!msg.message) return; // пустое сообщение (медиа без текста)
+      const parsed = parseNotification(msg.message);
+      console.log(parsed);
+
+      //console.log("💬 Новое сообщение:", msg.message);
+
+      // Сохраняем в MongoDB
+      // const dbMsg = new MessageModel({
+      //   chatId: targetChat.id.toString(),
+      //   chatName: targetChat.name,
+      //   messageId: msg.id,
+      //   text: msg.message,
+      //   date: msg.date
+      // });
+      //await dbMsg.save();
+
+    }, new NewMessage({ chats: [OIbotDialog.id] }));
+
+    // const messages = await client.getMessages(OIbot.id, { limit: 10 });
+    // for (const message of messages) {
+    //   console.log("💬", message.message);
+    // }
   } catch (err) {
     console.error("❌ Ошибка при получении сообщений:", err.message);
   }
