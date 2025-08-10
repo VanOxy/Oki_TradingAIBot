@@ -8,8 +8,8 @@ function cleanText(text) {
 function parseNotification(text) {
   const cleanedText = cleanText(text);
   const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line);
+  
   let pair = null;
-
   let exchange = null;
   let openInterest = null;
   let volume = null;
