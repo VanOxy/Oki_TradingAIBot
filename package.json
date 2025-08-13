@@ -1,6 +1,7 @@
 {
   "name": "bot_bot",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "run.js",
   "scripts": {
@@ -14,6 +15,7 @@
     "input": "^1.0.1",
     "telegram": "^2.26.22",
     "undici": "^7.13.0",
+    "ws": "^8.18.3",
     "zeromq": "^6.5.0"
   }
 }

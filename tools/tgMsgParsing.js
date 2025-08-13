@@ -9,7 +9,7 @@ function parseNotification(text) {
   const cleanedText = cleanText(text);
   const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line);
   
-  let pair = null;
+  let token = null;
   let exchange = null;
   let openInterest = null;
   let volume = null;
@@ -19,7 +19,7 @@ function parseNotification(text) {
   let tradesCount8h = null;
 
   if (lines[0] !== '8 HOUR REPORT') {
-    pair = lines[0];
+    token = lines[0];
     exchange = lines[1].replace('#', '');
     openInterest = lines[3].split(' ')[2].replace('%', '');
     volume = lines[4].split(' ')[2].replace('%', '');
@@ -36,7 +36,7 @@ function parseNotification(text) {
   }
 
   const data = {
-    pair: pair,
+    token: token,
     exchange: exchange,
     openInterest: openInterest,
     volume: volume,
@@ -49,4 +49,4 @@ function parseNotification(text) {
   return data;
 }
 
-module.exports = { parseNotification };
+export { parseNotification };

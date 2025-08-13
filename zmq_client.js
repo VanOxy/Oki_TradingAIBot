@@ -1,6 +1,5 @@
-// zmq_client.js
-const zmq = require("zeromq");
-require('dotenv').config();
+import 'dotenv/config';
+import zmq from 'zeromq';
 
 class ZMQClient {
   constructor(addr) {
@@ -28,7 +27,7 @@ class ZMQClient {
     }
   }
 
-  async sendTrigger(symbol, features) {
+  async sendTgData(symbol, features) {
     return this.send({ type: "trigger", symbol, features });
   }
 
@@ -38,4 +37,4 @@ class ZMQClient {
 }
 
 const client = new ZMQClient();
-module.exports = client;
+export default client;
