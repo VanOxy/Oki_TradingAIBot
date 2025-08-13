@@ -27,12 +27,23 @@ class ZMQClient {
     }
   }
 
-  async sendTgData(symbol, features) {
-    return this.send({ type: "trigger", symbol, features });
+  //   const data = {
+  //     token: token,
+  //     exchange: exchange,
+  //     openInterest: openInterest,
+  //     volume: volume,
+  //     trades8h: trades8h,
+  //     oiChange4h: oiChange4h,
+  //     coinChange24h: coinChange24h,
+  //     tradesCount8h: tradesCount8h,
+  // };
+  async sendTgData(data) {
+    return this.send({ type: 'tg', ...data });
   }
 
-  async sendMarket(symbol, features) {
-    return this.send({ type: "market", symbol, features });
+  // describe data structure here --> later
+  async sendMarket(data) {
+    return this.send({ type: 'bnn_market', ...data });
   }
 }
 

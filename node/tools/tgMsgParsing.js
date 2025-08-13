@@ -5,7 +5,7 @@ function cleanText(text) {
   return text.replace(/[^\w\s\d.%:(),#=-]/g, '').trim();
 }
 
-function parseNotification(text) {
+function parseTgNotification(text) {
   const cleanedText = cleanText(text);
   const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line);
   
@@ -16,7 +16,7 @@ function parseNotification(text) {
   let trades8h = null;
   let oiChange4h = null;
   let coinChange24h = null;
-  let tradesCount8h = null;
+  let notificationsCount8h = null;
 
   if (lines[0] !== '8 HOUR REPORT') {
     token = lines[0];
@@ -27,11 +27,11 @@ function parseNotification(text) {
       trades8h = lines[5].split(' ')[2];
       oiChange4h = lines[6].split('=')[1].replace('%', '');
       coinChange24h = lines[7].split('=')[1].replace('%', '');
-      tradesCount8h = lines[8].split(' ')[1];
+      notificationsCount8h = lines[8].split(' ')[1];
     } else {
       oiChange4h = lines[5].split('=')[1].replace('%', '');
       coinChange24h = lines[6].split('=')[1].replace('%', '');
-      tradesCount8h = lines[7].split(' ')[1];
+      notificationsCount8h = lines[7].split(' ')[1];
     }
   }
 
@@ -43,10 +43,10 @@ function parseNotification(text) {
     trades8h: trades8h,
     oiChange4h: oiChange4h,
     coinChange24h: coinChange24h,
-    tradesCount8h: tradesCount8h,
+    notificationsCount8h: notificationsCount8h,
   };
 
   return data;
 }
 
-export { parseNotification };
+export { parseTgNotification };

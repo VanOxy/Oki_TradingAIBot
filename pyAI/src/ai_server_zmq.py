@@ -1,17 +1,17 @@
-# ai_server_zmq.py
 import zmq
 import json
 
-ADDR = "tcp://*:5555"  # слушаем все интерфейсы; можно сузить
+ADDR = "tcp://*:5555" 
 
-def handle_trigger(msg):
-    symbol = msg.get("symbol")
-    features = msg.get("features", [])
+def handle_tg_message(msg):
+    data = msg.get("data", {})
+    #symbol = msg.get("token")
+    #features = msg.get("features", [])
     # TODO: вызов твоей модели для триггера
     score = 0.5  # заглушка
-    return {"symbol": symbol, "score": float(score), "type": "trigger"}
+    return {"symbol": data.token}
 
-def handle_market(msg):
+def handle_bnn_market_data(msg):
     symbol = msg.get("symbol")
     features = msg.get("features", [])
     # TODO: вызов твоей модели для рынка (PPO/FinRL и т.п.)
@@ -26,14 +26,14 @@ def main():
 
     while True:
         try:
-            raw = sock.recv_string()        # ждём JSON
+            raw = sock.recv_string()
             msg = json.loads(raw)
             mtype = (msg.get("type") or "").lower()
 
-            if mtype == "trigger":
-                resp = handle_trigger(msg)
-            elif mtype == "market":
-                resp = handle_market(msg)
+            if mtype == "tg":
+                resp = handle_tg_message(msg)
+            elif mtype == "bnn_market":
+                resp = handle_bnn_market_data(msg)
             else:
                 resp = {"error": f"unknown type '{mtype}'"}
 

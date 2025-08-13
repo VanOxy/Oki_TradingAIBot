@@ -1,4 +1,4 @@
-// klineFeed.js  (ESM)
+// klineFeed.js  (ESM) <--> @binance/connector
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 

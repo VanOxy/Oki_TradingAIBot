@@ -4,10 +4,9 @@ import input from 'input';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { NewMessage } from 'telegram/events/index.js';
-import { parseNotification } from './tools/tgMsgParsing.js';
+import { parseTgNotification } from './tools/tgMsgParsing.js';
 import zmqClient from './zmq_client.js';
 import KlineFeed from './klineFeed.js';
-import { log } from 'console';
 
 // ====== GLOBALS ======
 const apiId = parseInt(process.env.API_ID); // из твоего приложения Telegram
@@ -68,7 +67,7 @@ if (!tgClient) {
   // подключаемся к ZMQ
   await zmqClient.connect();
 
-  // ============ BINANCE STREAM =============
+  // ============ INIT BINANCE STREAM =============
   const klineFeed = new KlineFeed({
     market: 'spot',   // или 'futures'
     interval: '1m',      // '1m','5m','15m', '1h'
@@ -76,10 +75,10 @@ if (!tgClient) {
   });
 
   klineFeed.on('status', s => {
-    if (s.type === 'open') console.log('WS connected');
-    if (s.type === 'close') console.log('WS closed');
-    if (s.type === 'error') console.error('WS error:', s.error?.message);
-    if (s.type === 'reconnect_scheduled') console.log('reconnect in', s.delay, 'ms');
+    if (s.type === 'open') console.log('Kline WS connected');
+    if (s.type === 'close') console.log('Kline WS closed');
+    if (s.type === 'error') console.error('Kline WS error:', s.error?.message);
+    if (s.type === 'reconnect_scheduled') console.log('Kline WS reconnect in', s.delay, 'ms');
   });
 
   klineFeed.on('kline', (candle) => {
@@ -93,11 +92,12 @@ if (!tgClient) {
     const msg = event.message;
     if (!msg || !msg.message) return;
 
-    const parsed = parseNotification(msg.message);
+    const parsed = parseTgNotification(msg.message);
     console.log("📬 сообщение от ТГ парсера");
     console.log(parsed);
 
   //   const data = {
+  //     token: token,
   //     exchange: exchange,
   //     openInterest: openInterest,
   //     volume: volume,
@@ -107,26 +107,30 @@ if (!tgClient) {
   //     tradesCount8h: tradesCount8h,
   // };
 
-    try {
-      const res = await zmqClient.sendTgData(parsed.token, features);
+    try { 
+      const res = await zmqClient.sendTgData(parsed);
       if (res.error) {
         console.error("AI error:", res.error);
       } else {
-        console.log(`🤖 AI(TRIGGER) ${parsed.symbol} → score=${Number(res.score).toFixed(3)}`);
+        console.log(`🤖 AI(TRIGGER) ${parsed.token} → score=${Number(res.score).toFixed(3)}`);
       }
     } catch (e) {
       console.error("ZMQ Trigger error:", e.message);
     }
 
-    // Когда добавишь сбор рынка (OHLCV/CVD/OI):
-  // const marketFeatures = buildMarketFeaturesForSymbol(parsed.symbol);
-  // if (marketFeatures) {
-  //   try {
-  //     const resM = await zmqClient.sendMarket(parsed.symbol, marketFeatures);
-  //     if (resM.error) console.error("AI market error:", resM.error);
-  //     else console.log(`🤖 AI(MARKET) ${parsed.symbol} → score=${Number(resM.score).toFixed(3)}`);
-
   }, new NewMessage({ chats: [OIbotDialog.id] }));
+
+  try { 
+      const res = await zmqClient.sendTgData({hello: "motherfockers"});
+      if (res.error) {
+        console.error("AI error:", res.error);
+      } else {
+        console.log(`🤖 AI(TRIGGER) ${parsed.token} → score=${Number(res.score).toFixed(3)}`);
+      }
+    } catch (e) {
+      console.error("ZMQ Trigger error:", e.message);
+    }
+  
 })().catch(error => {
   console.error("❌ Ошибка в основном процессе:", error)
   process.exit(1);
