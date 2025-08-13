@@ -6,6 +6,7 @@ class ZMQClient {
     this.addr = addr || process.env.AI_ZMQ_ADDR || "tcp://127.0.0.1:5555";
     this.sock = new zmq.Request();
     this.connected = false;
+    this._chain = Promise.resolve(); // очередь
   }
 
   async connect() {
@@ -17,14 +18,13 @@ class ZMQClient {
 
   async send(payload) {
     if (!this.connected) await this.connect();
-    await this.sock.send(JSON.stringify(payload));
-    const [reply] = await this.sock.receive();
-    const text = reply.toString();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { error: "Invalid JSON from server", raw: text };
-    }
+    this._chain = this._chain.then(async () => {
+      await this.sock.send(JSON.stringify(payload));
+      const [reply] = await this.sock.receive();
+      const text =  Buffer.from(reply).toString();
+      try { return JSON.parse(text); } catch { return { error: "Invalid JSON from server", raw: text }; }
+    });
+    return this._chain;
   }
 
   //   const data = {
@@ -47,5 +47,4 @@ class ZMQClient {
   }
 }
 
-const client = new ZMQClient();
-export default client;
+export default new ZMQClient();
