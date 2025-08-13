@@ -12,8 +12,8 @@
   "dependencies": {
     "dotenv": "^17.2.1",
     "input": "^1.0.1",
-    "mongoose": "^8.17.1",
     "telegram": "^2.26.22",
+    "undici": "^7.13.0",
     "zeromq": "^6.5.0"
   }
 }

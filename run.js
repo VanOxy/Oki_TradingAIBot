@@ -1,7 +1,6 @@
 require('dotenv').config();
 const fs = require('fs');
 const input = require("input");
-//const mongoose = require('mongoose');
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
@@ -74,7 +73,6 @@ if (!client) {
     console.log(parsed);
 
     const data = {
-      pair: pair,
       exchange: exchange,
       openInterest: openInterest,
       volume: volume,
@@ -128,8 +126,47 @@ if (!client) {
   // for (const message of messages) {
   //   console.log("💬", message.message);
   // }
-})().catch(console.error);
+})().catch(error => {
+  console.error("❌ Ошибка в основном процессе:", error)
+  process.exit(1);
+});
 
 function nz(v) {
   return (v === null || v === undefined || Number.isNaN(v)) ? 0 : Number(v);
 }
+
+// Обработка graceful shutdown
+async function shutdown() {
+  console.log('Получен сигнал завершения, закрываем соединения...');
+  try {
+    //await closeBinanceFeed();
+    console.log('Все соединения закрыты, завершаем процесс');
+    process.exit(0);
+  } catch (error) {
+    console.error('Ошибка при закрытии соединений:', error);
+    process.exit(1);
+  }
+}
+
+// Обработка SIGINT (Ctrl+C)
+process.on('SIGINT', async () => {
+  console.log('Получен SIGINT (Ctrl+C)');
+  await shutdown();
+});
+
+// Обработка SIGTERM (например, от Docker или ОС)
+process.on('SIGTERM', async () => {
+  console.log('Получен SIGTERM');
+  await shutdown();
+});
+
+// Обработка необработанных ошибок (опционально)
+process.on('uncaughtException', (error) => {
+  console.error('Необработанная ошибка:', error);
+  shutdown();
+});
+
+// Обработка события exit (только логирование, асинхронные операции здесь не работают)
+process.on('exit', (code) => {
+  console.log(`Процесс завершён с кодом: ${code}`);
+});
