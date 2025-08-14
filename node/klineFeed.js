@@ -23,6 +23,7 @@ export default class KlineFeed extends EventEmitter {
     this._reconnectAttempts = 0;
   }
 
+  // Получить URL конечной точки WebSocket
   get endpoint() {
     return this.market === 'futures'
       ? 'wss://fstream.binance.com/ws'   // фьючи
@@ -60,7 +61,7 @@ export default class KlineFeed extends EventEmitter {
         const k = msg.k;
         // берём событие только при закрытии свечи
         if (k.x === true) {
-          const payload = mapKlineClose(msg.s, k);
+          const payload = mapKlineTokenClose(msg.s, k);
           this.emit('kline', payload);
         }
       }
@@ -83,6 +84,8 @@ export default class KlineFeed extends EventEmitter {
     const s = String(symbol).toLowerCase();
     if (this.symbols.has(s)) return;
     this.symbols.add(s);
+    console.log("Kline --> Подписываемся на символ:", s);
+    console.log("pool --> ", this.symbols);
     if (this.connected) {
       this._send({
         method: 'SUBSCRIBE',
@@ -141,10 +144,9 @@ export default class KlineFeed extends EventEmitter {
   }
 
   /* --- внутренние --- */
-
   _send(obj) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify(obj));
+    this.ws.send(JSON.stringify(obj), err => console.log(err));
   }
 
   _startPing() {
@@ -171,7 +173,7 @@ export default class KlineFeed extends EventEmitter {
 }
 
 /** Приводим kline от Binance к твоему формату */
-function mapKlineClose(symbol, k) {
+function mapKlineTokenClose(symbol, k) {
   // k: { t: openTime, T: closeTime, s: symbol, i: interval, f, L, o,h,l,c, v, n, x, q, V, Q, B }
   const open = Number(k.o);
   const high = Number(k.h);

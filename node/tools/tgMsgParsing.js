@@ -49,4 +49,46 @@ function parseTgNotification(text) {
   return data;
 }
 
-export { parseTgNotification };
+function _parseTg1hReport(text) {
+  const cleaned = cleanText(text);
+  const lines = cleaned
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const indexByToken = new Map(); // token -> index
+  const order = [];
+
+  for (const line of lines) {
+    // пропускаем заголовок/футер вида "8 HOUR REPORT"
+    if (/^8 HOUR REPORT$/i.test(line)) continue;
+
+    // пример строки после cleanText:
+    // "31  #FORTHUSDT  Day:14,12:53"
+    const m = line.match(/^(\d+)\s+.*?#([A-Z0-9]+)\b/i);
+    if (!m) continue;
+
+    const idx = Number(m[1]);
+    const token = m[2].toUpperCase();
+
+    if (!indexByToken.has(token)) {
+      indexByToken.set(token, idx);
+      order.push(token);
+    } else if (idx > indexByToken.get(token)) {
+      indexByToken.set(token, idx);
+    }
+  }
+
+  return order.map(t => ({ token: t, index: indexByToken.get(t) }));
+}
+
+// если нужно сразу объект-словарь { TOKEN: index, ... }:
+function parseTg1hReportDict(text) {
+  const arr = _parseTg1hReport(text);
+  const out = {};
+  for (const { token, index } of arr) out[token] = index;
+  return out;
+}
+
+
+export { parseTgNotification, parseTg1hReportDict};
