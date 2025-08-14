@@ -4,12 +4,12 @@ import json
 ADDR = "tcp://*:5555" 
 
 def handle_tg_message(msg):
-    data = msg.get("data", {})
-    #symbol = msg.get("token")
+    token = msg.get("token")
+    print('received ' + token )
+    print('whole message' + msg)
     #features = msg.get("features", [])
     # TODO: вызов твоей модели для триггера
-    score = 0.5  # заглушка
-    return {"symbol": data.token}
+    return {"symbol": token}
 
 def handle_bnn_market_data(msg):
     symbol = msg.get("symbol")
