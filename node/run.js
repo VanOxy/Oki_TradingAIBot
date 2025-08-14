@@ -56,11 +56,11 @@ if (!tgClient) {
     if (s.type === 'reconnect_scheduled') console.log('Kline WS reconnect in', s.delay, 'ms');
   });
 
-  klineFeed.on('kline', candle => {
+  klineFeed.on('kline', async candle => {
     console.log("kline --> data from bbn:");
     console.log(`[${candle.interval}] ${candle.symbol} ${candle.openTime} O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close} qVol:${candle.quoteVolume}`);
     // тут же можешь пушить в zmq
-    zmqClient.sendMarket(candle);
+    const res = await zmqClient.sendMarket(candle);
   });
 
   //klineFeed.connect();
