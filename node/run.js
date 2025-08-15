@@ -75,19 +75,24 @@ if (!tgClient) {
       const report = parseTg1hReportDict(msg.message);
       console.log("8 HOUR REPORT");
       console.log( report);
-    } else { // manage notifications
+    } else { 
+      // manage notifications
       console.log("📬 Получено сообщение от бота:", msg.message);
       console.log("отправляю в парсер");
       const parsed = await parseTgNotification(msg.message);
       console.log("сообщение от ТГ парсера получено:", parsed);
+      // check
       if (!parsed || !parsed.token) {
         console.error("❌ Ошибка парсинга сообщения:", msg.message);
         return;
       }
       // manage only binance tokens
-      if(parsed.exchange === 'Binance') {
+      //if(parsed.exchange === 'Binance') {
+        // подписываемся на символ в kline
         console.log("run.js --> Подписываемся на символ в kline:", parsed.token);
-        klineFeed.addSymbol(parsed.token);
+        //klineFeed.addSymbol(parsed.token);
+
+        // отправляем в zmq
         try { 
           console.log('отсылаем data в zmq');
           const res = await zmqClient.sendTgData(parsed);
@@ -99,7 +104,7 @@ if (!tgClient) {
         } catch (e) {
           console.error("ZMQ error:", e.message);
         }
-      }
+      //}
     }
   }, new NewMessage({ chats: [OIbotDialog.id] }));
   //testPyServer(zmqClient);

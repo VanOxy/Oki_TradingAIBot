@@ -6,10 +6,10 @@ ADDR = "tcp://*:5555"
 def handle_tg_message(msg):
     token = msg.get("token")
     print('received ' + token )
-    print('whole message' + msg)
+    print(msg)
     #features = msg.get("features", [])
     # TODO: вызов твоей модели для триггера
-    return {"symbol": token}
+    return {"handle_tg_message принял": token}
 
 def handle_bnn_market_data(msg):
     symbol = msg.get("symbol")
