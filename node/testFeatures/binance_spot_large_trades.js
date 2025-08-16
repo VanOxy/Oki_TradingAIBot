@@ -7,40 +7,110 @@ class BinanceSpotLargeTrades {
         if (!Array.isArray(symbols) || symbols.length === 0) {
             throw new Error('Symbols must be a non-empty array');
         }
-        this.symbols = [...new Set(symbols.map(s => s.toLowerCase()))]; // Убираем дубликаты
+        this.symbols = [];
         this.minAmountUSD = minAmountUSD;
         this.ws = null;
-        this.socketUrl = null; // Явная инициализация
-        this.reconnectAttempts = 0; // Счетчик попыток переподключения
-        this.maxReconnectAttempts = 5; // Максимум попыток
-        this.reconnectDelay = 1000; // Задержка 1 секунда
-        this.shutdown = false; // Флаг завершения
-        this.updateSocketUrl();
+        this.socketUrl = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000;
+        this.shutdown = false;
+        this.validSymbols = new Set();
+        this.cacheExpiration = 0;
+        this.cacheDuration = 3600 * 1000; // 1 час
+        // Инициализация символов
+        this.initializeSymbols(symbols).then(() => {
+            if (this.symbols.length > 0) {
+                this.updateSocketUrl();
+                this.run();
+            } else {
+                console.error('Нет валидных символов для подписки. Завершение работы.');
+                this.shutdown();
+            }
+        });
+    }
+
+    async fetchExchangeInfo() {
+        try {
+            const response = await fetch('https://api.binance.com/api/v3/exchangeInfo');
+            if (!response.ok) {
+                throw new Error(`HTTP ошибка: ${response.status}`);
+            }
+            const data = await response.json();
+            this.validSymbols = new Set(
+                data.symbols
+                    .filter(s => s.status === 'TRADING')
+                    .map(s => s.symbol.toLowerCase())
+            );
+            this.cacheExpiration = Date.now() + this.cacheDuration;
+            console.log(`Кэш символов обновлен. Всего активных пар: ${this.validSymbols.size}`);
+        } catch (error) {
+            console.error(`Ошибка при получении exchangeInfo: ${error.message}`);
+            this.validSymbols = new Set();
+            this.cacheExpiration = 0;
+        }
+    }
+
+    async validateSymbol(symbol) {
+        if (Date.now() > this.cacheExpiration) {
+            await this.fetchExchangeInfo();
+        }
+        return this.validSymbols.has(symbol.toLowerCase());
+    }
+
+    async initializeSymbols(symbols) {
+        await this.fetchExchangeInfo();
+        for (const symbol of symbols) {
+            const normalizedSymbol = symbol.toLowerCase();
+            if (await this.validateSymbol(normalizedSymbol)) {
+                this.symbols.push(normalizedSymbol);
+            } else {
+                console.warn(`Символ ${normalizedSymbol} невалиден или не торгуется. Пропущен.`);
+            }
+        }
     }
 
     updateSocketUrl() {
+        if (this.symbols.length === 0) {
+            this.socketUrl = null;
+            return;
+        }
         const streams = this.symbols.map(s => `${s}@aggTrade`).join('/');
         this.socketUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+        console.log(`Обновлен socketUrl: ${this.socketUrl}`);
     }
 
-    addSymbol(symbol) {
+    /**
+     * @param {string} symbol - Символ для добавления в подписку
+     */
+    async addSymbol(symbol) {
         const normalizedSymbol = symbol.toLowerCase();
         if (this.symbols.includes(normalizedSymbol)) {
             console.log(`Символ ${normalizedSymbol} уже в подписке`);
             return false;
         }
-        this.symbols.push(normalizedSymbol);
-        console.log(`Добавлен символ: ${normalizedSymbol}. Переподключение...`);
-        this.restart();
-        return true;
+        if (await this.validateSymbol(normalizedSymbol)) {
+            this.symbols.push(normalizedSymbol);
+            console.log(`Добавлен символ: ${normalizedSymbol}. Переподключение...`);
+            this.restart();
+            return true;
+        } else {
+            console.warn(`Символ ${normalizedSymbol} невалиден или не торгуется. Не добавлен.`);
+            return false;
+        }
     }
 
     restart() {
+        if (this.shutdown || this.symbols.length === 0) {
+            console.log('Переподключение отменено: завершение или пустой список символов');
+            return;
+        }
         if (this.ws) {
             this.ws.close();
+            this.ws = null;
         }
         this.updateSocketUrl();
-        this.run();
+        setTimeout(() => this.run(), this.reconnectDelay); // Задержка перед новым подключением
     }
 
     onMessage(message) {
@@ -65,7 +135,8 @@ class BinanceSpotLargeTrades {
     }
 
     onError(error) {
-        console.error(`Ошибка: ${error.message}`);
+        console.error(`Ошибка WebSocket: ${error.message}`);
+        // Переподключение обрабатывается в onClose
     }
 
     onClose() {
@@ -73,41 +144,46 @@ class BinanceSpotLargeTrades {
         if (!this.shutdown && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(`Попытка переподключения ${this.reconnectAttempts}/${this.maxReconnectAttempts} через ${this.reconnectDelay}ms...`);
-            setTimeout(() => this.restart(), this.reconnectDelay);
+            this.restart();
         } else if (!this.shutdown) {
             console.error('Достигнут лимит попыток переподключения. Инициируется завершение работы...');
             this.shutdown();
         }
-        // Если this.shutdown === true, ничего не делаем, так как закрытие инициировано shutdown
     }
 
     onOpen() {
         console.log(`Соединение открыто. Отслеживание крупных сделок для: ${this.symbols.join(', ')}`);
-        this.reconnectAttempts = 0; // Сбрасываем счетчик при успешном подключении
+        this.reconnectAttempts = 0;
     }
 
     async shutdown() {
         if (this.shutdown) {
-            return; // Предотвращаем повторный вызов shutdown
+            return;
         }
         console.log('Завершение работы...');
-        this.shutdown = true; // Устанавливаем флаг
+        this.shutdown = true;
         if (this.ws) {
-            this.ws.close(); // Закрываем соединение
-            this.ws = null; // Очищаем ws, чтобы избежать дальнейших событий
+            this.ws.close();
+            this.ws = null;
         }
         process.exit(0);
     }
 
     run() {
-        if (this.shutdown) {
-            return; // Не запускаем новое соединение, если завершение уже инициировано
+        if (this.shutdown || this.symbols.length === 0 || !this.socketUrl) {
+            console.log('Подключение отменено: завершение, пустой список символов или отсутствует socketUrl');
+            return;
         }
-        this.ws = new WebSocket(this.socketUrl);
-        this.ws.on('open', () => this.onOpen());
-        this.ws.on('message', (data) => this.onMessage(data));
-        this.ws.on('error', (error) => this.onError(error));
-        this.ws.on('close', () => this.onClose());
+        try {
+            this.ws = new WebSocket(this.socketUrl);
+            this.ws.on('open', this.onOpen.bind(this));
+            this.ws.on('message', this.onMessage.bind(this));
+            this.ws.on('error', this.onError.bind(this));
+            this.ws.on('close', this.onClose.bind(this));
+        } catch (error) {
+            console.error(`Ошибка при создании WebSocket: ${error.message}`);
+            this.onClose(); // Запускаем переподключение
+        }
     }
 }
 
@@ -115,22 +191,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 if (process.argv[1] === __filename) {
-    const symbols = ['btcusdt']; // Начальный список
+    const symbols = ['btcusdt', 'ethusdt', 'invalidusdt'];
     const indicator = new BinanceSpotLargeTrades(symbols, 10000);
 
-    // Пример динамического добавления символов с задержкой
-    indicator.run();
-
     setTimeout(() => {
-        indicator.addSymbol('ethusdt'); // Добавляем ETH через 5 секунд
+        indicator.addSymbol('bnbusdt');
     }, 5000);
 
     setTimeout(() => {
-        indicator.addSymbol('bnbusdt'); // Добавляем BNB через 10 секунд
+        indicator.addSymbol('adausdt'); // Заменил omgusdt на существующую пару
     }, 10000);
 
     setTimeout(() => {
-        indicator.addSymbol('omgusdt'); // Добавляем OMG через 15 секунд
+        indicator.addSymbol('xyzusdt');
     }, 15000);
 
     process.on('SIGINT', async () => {
