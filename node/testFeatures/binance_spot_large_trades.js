@@ -208,19 +208,17 @@ class BinanceSpotLargeTrades {
             console.log('Подключение уже активно, в процессе или закрывается');
             return;
         }
-        setTimeout(() => {
-            try {
-                this.updateSocketUrl();
-                this.ws = new WebSocket(this.socketUrl);
-                this.ws.on('open', this.onOpen.bind(this));
-                this.ws.on('message', this.onMessage.bind(this));
-                this.ws.on('error', this.onError.bind(this));
-                this.ws.on('close', this.onClose.bind(this));
-            } catch (error) {
-                console.error(`Ошибка при создании WebSocket: ${error.message}, код: ${error.code || 'неизвестно'}`);
-                this.onClose();
-            }
-        }, 500); // Задержка 500 мс перед созданием WebSocket
+        try {
+            this.updateSocketUrl();
+            this.ws = new WebSocket(this.socketUrl);
+            this.ws.on('open', this.onOpen.bind(this));
+            this.ws.on('message', this.onMessage.bind(this));
+            this.ws.on('error', this.onError.bind(this));
+            this.ws.on('close', this.onClose.bind(this));
+        } catch (error) {
+            console.error(`Ошибка при создании WebSocket: ${error.message}, код: ${error.code || 'неизвестно'}`);
+            this.onClose();
+        }
     }
 }
 
@@ -232,23 +230,12 @@ if (process.argv[1] === __filename) {
 
     setTimeout(async () => {
         await indicator.addSymbol('btcusdt');
-    }, 8000);
-
-    setTimeout(async () => {
-        await indicator.addSymbol('ethusdt');
-    }, 16000);
+    }, 2000);
 
     setTimeout(async () => {
         await indicator.addSymbol('bnbusdt');
-    }, 24000);
+    }, 10000);
 
-    setTimeout(async () => {
-        await indicator.addSymbol('adausdt');
-    }, 32000);
-
-    setTimeout(async () => {
-        await indicator.addSymbol('xyzusdt');
-    }, 40000);
 
     process.on('SIGINT', async () => {
         console.log('\nПолучен сигнал SIGINT (Ctrl+C). Завершаем работу...');
