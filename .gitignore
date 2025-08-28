@@ -3,6 +3,7 @@ session.json
 .env
 .vscode
 package-lock.json
+vendor/
 
 __pycache__
 *.pyc
