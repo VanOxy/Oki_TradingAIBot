@@ -15,9 +15,23 @@ Lib/site-packages/
 Scripts/
 Include/
 vendor/
-# Custom config
-#results/
+# FinRL
 *.ipynb
+.github/
+docker/
+docs/
+examples/
+finrl/
+figs/
+unit_tests/
+.pre-commit-config.yaml
+1.66.32
+LICENSE
+poetry.lock
+pyproject.toml
+README.md
+setup.py
+setup.cfg
 
 # remove DS_Store
 **/.DS_Store
