@@ -3,7 +3,7 @@ import numpy as np
 import time, json, zmq
 
 from stream_buffer import Buffers
-from env_market import MarketEnv, MAX_TOKENS
+from FinRL.gpt.envs.env_market import MarketEnv, MAX_TOKENS
 
 ENDPOINT = "tcp://127.0.0.1:5555"
 
