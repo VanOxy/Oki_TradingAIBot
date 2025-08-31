@@ -5,7 +5,7 @@ session.json
 package-lock.json
 
 **/__pycache__/
-__pycache__
+__pycache__/
 *.pyc
 *.pyo
 *.pyd

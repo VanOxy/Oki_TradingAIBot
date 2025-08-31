@@ -1,7 +1,7 @@
 # single_token_demo.py
 import json, time, zmq, numpy as np
 from stream_buffer import Buffers
-from env_single_token import SingleTokenEnv
+from FinRL.gpt.envs.env_single_token import SingleTokenEnv
 
 ENDPOINT = "tcp://127.0.0.1:5555"
 TOKEN = "HUMAUSDT"
