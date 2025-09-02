@@ -6,6 +6,7 @@ from gymnasium import spaces
 from stream_buffer import Buffers
 from features import build_batch_state, FEATURE_DIM
 from exec_core import PortfolioSim, last_close_prices
+from config import STEP_TIMEOUT_SEC, MAX_TOKENS
 
 # фиксируем верхний предел под action/obs формы
 MAX_TOKENS = 80
@@ -48,19 +49,23 @@ class MarketEnv(gym.Env):
         return obs, info
 
     def step(self, action):
-        # ожидаем массив длиной MAX_TOKENS из {0,1,2}
         action = np.asarray(action, dtype=np.int64)
         action = np.clip(action, 0, 2)
-
-        # смаппим только для активной части
         active_n = len(self.tokens_order)
-        act_active = action[:active_n]
-        # 0,1,2 -> -1,0,+1
-        mapped = (act_active - 1).tolist()
+        act_active = (action[:active_n] - 1).tolist()  # -> {-1,0,+1}
+
+        # ждём хотя бы 1 новый kline среди активных
+        since = {t: self.buffers.last_kline_ts(t) or -1.0 for t in self.tokens_order}
+        self.buffers.wait_for_new_kline(
+            self.tokens_order,
+            since_ts=since,
+            timeout_sec=STEP_TIMEOUT_SEC,
+            min_new=1,  # можно увеличить, если хочешь ждать всех
+        )
 
         # цены по активным токенам и симуляция шага
         prices = last_close_prices(self.buffers, self.tokens_order)
-        reward, exec_info = self.sim.step(self.tokens_order, mapped, prices)
+        reward, exec_info = self.sim.step(self.tokens_order, act_active, prices)
 
         # новое наблюдение
         obs = self._obs()

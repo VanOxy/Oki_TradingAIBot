@@ -4,7 +4,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 
 from stream_buffer import Buffers
-from FinRL.gpt.envs.env_single_token import SingleTokenEnv
+from env_single_token import SingleTokenEnv
 from single_token_demo import prime_buffers
 
 TOKEN = "HUMAUSDT"

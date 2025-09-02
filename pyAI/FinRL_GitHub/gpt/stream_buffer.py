@@ -1,12 +1,9 @@
-# stream_buffer.py
 # минимальный каркас: подписка на ZMQ, буфер по токенам, безопасная нормализация
+import json, time
+import zmq
 
-import json
-import time
 from collections import deque, defaultdict
 from typing import Dict, Any, Deque, Optional
-
-import zmq
 
 
 # ============ CONFIG ============
@@ -14,7 +11,6 @@ ZMQ_ENDPOINT = "tcp://127.0.0.1:5555"  # поменяй на свой
 TG_DEQUE_MAX = 10
 KLINE_DEQUE_MAX = 72  # ~6 часов по 5м
 HEARTBEAT_SEC = 10
-
 
 # ============ HELPERS ============
 
@@ -38,7 +34,6 @@ def exchange_one_hot(name: Optional[str]) -> Dict[str, float]:
     bybit   = 1.0 if name == "bybit"   else 0.0
     # пример расширения: okx = 1.0 if name == "okx" else 0.0
     return {"ex_binance": binance, "ex_bybit": bybit}
-
 
 def now_ts() -> float:
     return time.time()
@@ -97,8 +92,18 @@ class TokenBuffer:
 
 class Buffers:
     """Глобальный пул: token -> TokenBuffer."""
-    def __init__(self) -> None:
+    def __init__(self, attach_endpoint: str | None = None):
         self.tokens: Dict[str, TokenBuffer] = defaultdict(TokenBuffer)
+        self._ctx = None
+        self._sub = None
+        self._poller = None
+        if attach_endpoint:
+            self._ctx = zmq.Context.instance()
+            self._sub = self._ctx.socket(zmq.SUB)
+            self._sub.connect(attach_endpoint)
+            self._sub.setsockopt_string(zmq.SUBSCRIBE, "")
+            self._poller = zmq.Poller()
+            self._poller.register(self._sub, zmq.POLLIN)
 
     def handle_packet(self, pkt: Dict[str, Any]) -> None:
         t = (pkt.get("type") or "").strip().lower()
@@ -122,6 +127,72 @@ class Buffers:
         buf = self.tokens.get(token)
         return buf.snapshot_light() if buf else None
 
+    def pump(self, timeout_ms: int = 0, max_msgs: int = 1000) -> int:
+        """Прочитать до max_msgs сообщений из ZMQ и разложить в буферы."""
+        if self._sub is None: 
+            return 0
+        n = 0
+        t0 = time.time()
+        while n < max_msgs:
+            socks = dict(self._poller.poll(timeout=timeout_ms if n == 0 else 0))
+            if self._sub not in socks or socks[self._sub] != zmq.POLLIN:
+                break
+            raw = self._sub.recv()
+            try:
+                msg = json.loads(raw.decode("utf-8"))
+            except Exception:
+                try:
+                    msg = json.loads(raw)
+                except Exception:
+                    continue
+            if isinstance(msg, dict) and "type" in msg:
+                self.handle_packet(msg)
+                n += 1
+        return n
+
+    def last_kline_ts(self, token: str) -> float | None:
+        #Вернуть ts последнего kline по токену или None, если нет данных.
+        tb = self.tokens.get(token)
+        if tb is None or not tb.klines:
+            return None
+        
+        last = tb.klines[-1]
+        # элементы обычно dict; но подстрахуемcя, если вдруг будет dataclass/obj
+        if isinstance(last, dict):
+            return last.get("ts")
+        return getattr(last, "ts", None)
+
+    def wait_for_new_kline(
+        self,
+        tokens: list[str],
+        since_ts: dict[str, float] | None = None,
+        timeout_sec: float = 30.0,
+        poll_interval_ms: int = 100,
+        min_new: int = 1,
+    ) -> dict[str, float]:
+        """ Ждем пока хотя бы min_new токенов получат kline новее, чем в since_ts.
+        Возвращаем {token: new_ts}. Пустой dict при таймауте."""
+        t_deadline = time.time() + timeout_sec
+        since_ts = since_ts or {}
+        got: dict[str, float] = {}
+
+        while time.time() < t_deadline:
+            #  подкачиваем входящие сообщения (если подписка подключена)
+            self.pump(timeout_ms=poll_interval_ms, max_msgs=1000)
+
+            for tok in tokens:
+                if tok in got:
+                    continue
+                cur = self.last_kline_ts(tok)
+                if cur is None:
+                    continue
+                prev = since_ts.get(tok, -1.0)
+                if cur > prev:
+                    got[tok] = cur
+
+            if len(got) >= min_new:
+                break
+        return got
 
 # ============ ZMQ SUBSCRIBER LOOP ============
 

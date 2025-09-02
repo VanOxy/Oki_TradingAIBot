@@ -1,7 +1,8 @@
 # single_token_demo.py
 import json, time, zmq, numpy as np
+from env_single_token import SingleTokenEnv
 from stream_buffer import Buffers
-from FinRL.gpt.envs.env_single_token import SingleTokenEnv
+from config import ENDPOINT
 
 ENDPOINT = "tcp://127.0.0.1:5555"
 TOKEN = "HUMAUSDT"
@@ -13,7 +14,7 @@ def prime_buffers(sec=3.0):
     sub.setsockopt_string(zmq.SUBSCRIBE, "")
     poller = zmq.Poller(); poller.register(sub, zmq.POLLIN)
 
-    bufs = Buffers()
+    bufs = Buffers(attach_endpoint=ENDPOINT)
     t0 = time.time()
     while time.time() - t0 < sec:
         socks = dict(poller.poll(timeout=200))
