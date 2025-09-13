@@ -4,7 +4,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
-import math
 
 # ---- Конфиг по рискам/издержкам ----
 @dataclass
@@ -25,17 +24,19 @@ class PortfolioSim:
     cfg: ExecConfig = field(default_factory=ExecConfig)
     cash: float = field(init=False)
     positions: Dict[str, Position] = field(default_factory=dict)
+    equity: float = field(init=False) 
     last_equity: float = field(init=False)
 
     def __post_init__(self):
-        self.cash = self.cfg.start_cash
-        self.last_equity = self.cfg.start_cash
+        self.cash = float(self.cfg.start_cash)
+        self.equity = float(self.cfg.start_cash)
+        self.last_equity = float(self.cfg.start_cash)
 
     # ---------- helpers ----------
     @staticmethod
-    # Применение слиппеджа к цене
+    #Корректируем цену на слиппедж.
+    # side: +1 -> buy, -1 -> sell
     def _price_with_slippage(price: float, side: int, slippage_bps: float) -> float:
-        # side: +1 buy, -1 sell
         slip = slippage_bps / 10_000.0
         return price * (1.0 + slip * (1 if side > 0 else -1))
 
@@ -45,14 +46,14 @@ class PortfolioSim:
         fee = abs(amount) * (fee_bps / 10_000.0)
         return amount - fee
 
-    # Переоценка позиций по текущим ценам
+    # Переоценка позиций по текущим ценам (без комиссий/слиппеджа).
     def _mark_to_market(self, prices: Dict[str, float]) -> float:
         equity = self.cash
         for t, pos in self.positions.items():
             px = prices.get(t, 0.0)
             if px > 0 and pos.qty != 0.0:
                 equity += pos.qty * px
-        return equity
+        return float(equity)
 
     # ---------- публичные методы ----------
     def sync_tokens(self, tokens: List[str]) -> None:
@@ -80,19 +81,19 @@ class PortfolioSim:
 
         # Сколько токенов реально торгуем на шаге
         trade_idxs = [i for i, a in enumerate(actions) if a != 0]
-        n_trades = max(1, len(trade_idxs))  # чтобы деление не на 0
+        n_trades = max(1, len(trade_idxs))  # чтобы делить не на 0
 
         # Общий риск-бюджет на шаг
         budget_step = prev_equity * self.cfg.risk_per_step
         budget_per_trade = budget_step / n_trades
 
-        logs = []
+        logs: List[Tuple[str, str]] = []
 
-        # 1) исполним торговые действия
+        # 1) Исполнение торговых действий
         for i in trade_idxs:
             t = tokens[i]
             a = actions[i]  # -1/ +1
-            px = prices.get(t, 0.0)
+            px = float(prices.get(t, 0.0))
             if px <= 0:
                 logs.append((t, "skip(no_price)"))
                 continue
@@ -101,7 +102,7 @@ class PortfolioSim:
             side = 1 if a > 0 else -1
 
             # капитал, который готовы задействовать в этой сделке
-            notional = min(self.cash, budget_per_trade)
+            notional = min(self.cash, budget_per_trade) if side > 0 else budget_per_trade
             if notional <= 0:
                 logs.append((t, "skip(no_cash)"))
                 continue
@@ -121,7 +122,7 @@ class PortfolioSim:
                 if new_qty != 0:
                     pos.entry = (pos.entry * abs(pos.qty) + trade_px * abs(qty)) / abs(new_qty)
             else:
-                # уменьшаем/переворот — pos.entry перезапишется при смене знака
+                # частичное закрытие или переворот — pos.entry перезапишется при смене знака
                 if new_qty == 0:
                     pos.entry = 0.0
                 elif (pos.qty > 0 and qty < 0) or (pos.qty < 0 and qty > 0):
@@ -135,7 +136,7 @@ class PortfolioSim:
         for t, pos in self.positions.items():
             if pos.qty == 0.0:
                 continue
-            px = prices.get(t, 0.0)
+            px = float(prices.get(t, 0.0))
             if px <= 0:
                 continue
 
@@ -145,7 +146,8 @@ class PortfolioSim:
                 if px <= stop_level:
                     # закрываем по рынку (со слиппеджем в "sell")
                     trade_px = self._price_with_slippage(px, side=-1, slippage_bps=self.cfg.slippage_bps)
-                    flow = -(-pos.qty) * trade_px  # продаем pos.qty
+                    qty_traded = -pos.qty  # продаём всё (sell)
+                    flow = -qty_traded * trade_px  # продаем pos.qty
                     flow = self._apply_fee(flow, self.cfg.fee_bps)
                     self.cash += flow
                     logs.append((t, f"STOP LONG @{trade_px:.6f} qty={-pos.qty:.6f}"))
@@ -157,35 +159,44 @@ class PortfolioSim:
                 stop_level = pos.entry * (1.0 + self.cfg.stop_loss_pct)
                 if px >= stop_level:
                     trade_px = self._price_with_slippage(px, side=+1, slippage_bps=self.cfg.slippage_bps)
-                    flow = -(+(-pos.qty)) * trade_px  # выкупаем шорт
+                    qty_traded = -pos.qty  # покупаем обратно (buy)
+                    flow = -qty_traded * trade_px  # выкупаем шорт
                     flow = self._apply_fee(flow, self.cfg.fee_bps)
                     self.cash += flow
                     logs.append((t, f"STOP SHORT @{trade_px:.6f} qty={+(-pos.qty):.6f}"))
                     pos.qty = 0.0
                     pos.entry = 0.0
 
-        # 3) считаем equity и reward
+        # 3) считаем equity, reward, tradesCount
         equity = self._mark_to_market(prices)
-        reward = equity - prev_equity  # dPnL за шаг
+        self.equity = float(equity)
+        step_pnl = float(equity - prev_equity)  # dPnL за шаг
+        trades = sum(1 for _, msg in logs if str(msg).startswith("trade"))
+
+        # приведение позиций к простому словарю
+        positions_out = {
+            t: {"qty": float(p.qty), "entry": float(p.entry)} for t, p in self.positions.items()
+        }
 
         info = {
-            "prev_equity": round(prev_equity, 6),
-            "equity": round(equity, 6),
-            "cash": round(self.cash, 6),
-            "positions": {t: {"qty": p.qty, "entry": p.entry} for t, p in self.positions.items() if p.qty != 0.0},
+            "equity": float(self.equity),
+            "prev_equity": float(prev_equity),
+            "cash": float(self.cash),
+            "positions": dict(self.positions), 
             "logs": logs,
+            "trades": int(trades), # сколько сделок исполнено в шаге
         }
-        self.last_equity = equity
-        return reward, info
+        self.last_equity = float(equity)
+        return step_pnl, info
 
 
-# --------- удобная утилита для извлечения цен из наших буферов (последняя close) ---------
+# --------- утилита для извлечения цен из наших буферов (последняя close) ---------
 def last_close_prices(buffers, tokens: List[str]) -> Dict[str, float]:
-    out = {}
+    out: Dict[str, float] = {}
     for t in tokens:
         buf = buffers.tokens.get(t)
         px = 0.0
-        if buf and buf.klines:
+        if buf and getattr(buf, "klines", None):
             last = buf.klines[-1]
             px = float(last.get("close", 0.0) or 0.0)
         out[t] = px

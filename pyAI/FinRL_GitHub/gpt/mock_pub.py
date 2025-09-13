@@ -1,8 +1,9 @@
 # mock_pub.py
 import json, time, zmq, random
 
-PUB_ENDPOINT = "tcp://127.0.0.1:5555"  # тот же, что в stream_buffer.py
+PUB_ENDPOINT = "tcp://127.0.0.1:5555"
 
+# создаем PUB-сокет
 ctx = zmq.Context.instance()
 pub = ctx.socket(zmq.PUB)
 pub.bind(PUB_ENDPOINT)
@@ -11,7 +12,10 @@ time.sleep(0.5)  # дать SUB успеть подключиться
 tokens = ["HUMAUSDT", "A2ZUSDT"]
 
 def send(obj):
-    pub.send(json.dumps(obj).encode("utf-8"))
+    omg = json.dumps(obj).encode("utf-8")
+    print(omg)
+    pub.send(omg)
+
 
 i = 0
 while True:
@@ -28,7 +32,7 @@ while True:
         "notificationsCount8h": str(i % 12),
         "ts": time.time(),
     })
-    time.sleep(1)
+    time.sleep(0.2)
 
     # KLINE пакет (упрощённый)
     send({
@@ -44,4 +48,4 @@ while True:
         "ts": time.time(),
     })
     i += 1
-    time.sleep(1)
+    time.sleep(0.2)
