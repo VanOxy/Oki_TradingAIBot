@@ -61,6 +61,14 @@ class PortfolioSim:
         for t in tokens:
             self.positions.setdefault(t, Position())
 
+    def reset(self):
+        self.cash = float(self.cfg.start_cash)
+        self.equity = float(self.cfg.start_cash)
+        self.last_equity = float(self.cfg.start_cash)
+        for p in self.positions.values():
+            p.qty = 0.0
+            p.entry = 0.0
+            
     def step(
         self,
         tokens: List[str],
