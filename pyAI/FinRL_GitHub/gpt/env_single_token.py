@@ -8,8 +8,7 @@ from features import build_batch_state, FEATURE_DIM
 from exec_core import PortfolioSim, last_close_prices
 from config import STEP_TIMEOUT_SEC
 
-# Пока без штрафа за частые сделки: включим потом, когда агент оживет
-TRADE_PENALTY = 0.0
+TRADE_PENALTY = 0.0001
 
 class SingleTokenEnv(gym.Env):
     """
@@ -100,7 +99,7 @@ class SingleTokenEnv(gym.Env):
         # --- 1) исполняем действие прямо сейчас (по текущей цене)
         prices_now = last_close_prices(self.buffers, [self.token])
 
-        # маппим действие 0/1/2 -> -1/0/+1 и  исполняем текущее действие через сим
+        # маппим и исполняем текущее действие через сим
         a = [-1, 0, +1][int(max(0, min(2, action)))]
         _, exec_info_now = self.sim.step(tokens=[self.token], actions=[a], prices=prices_now)
 

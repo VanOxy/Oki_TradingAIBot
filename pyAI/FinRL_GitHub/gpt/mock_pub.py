@@ -32,7 +32,7 @@ while True:
         "notificationsCount8h": str(i % 12),
         "ts": time.time(),
     })
-    time.sleep(0.2)
+    time.sleep(0.05)
 
     # KLINE пакет (упрощённый)
     send({
@@ -48,4 +48,4 @@ while True:
         "ts": time.time(),
     })
     i += 1
-    time.sleep(0.2)
+    time.sleep(0.05)

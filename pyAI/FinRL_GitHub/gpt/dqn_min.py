@@ -54,16 +54,15 @@ if __name__ == "__main__":
     )
 
     ckpt = CheckpointCallback(save_freq=5_000, save_path="./ckpts", name_prefix="dqn")
-    model.learn(total_timesteps=300, progress_bar=True, callback=ckpt)
+    model.learn(total_timesteps=3000, progress_bar=True, callback=ckpt)
     model.save("./ckpts/dqn_last")
 
     # sanity: три шага подряд
     print("sanity check...")
     # reset env
     obs, _ = env.reset()
-    print("obs_reset --> obs=", obs)
     for i in range(3):
-        action, _ = model.predict(obs, deterministic=False)
+        action, _ = model.predict(obs, deterministic=True)
         obs, reward, _, _, info = env.step(action)
         exec_ = info.get("exec", {})
         print(
