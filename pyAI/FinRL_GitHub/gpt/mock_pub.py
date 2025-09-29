@@ -9,21 +9,23 @@ pub = ctx.socket(zmq.PUB)
 pub.bind(PUB_ENDPOINT)
 time.sleep(0.5)  # дать SUB успеть подключиться
 
-tokens = ["HUMAUSDT", "A2ZUSDT"]
+tokens = ["A2ZUSDT", "APEXUSDT", "RLCUSDT", "KAITOUSDT", "SKLUSDT", "ALPINEUSDT", "FFUSDT", "DOODUSDT", "PORT3USDT", "ATHUSDT", "DAMUSDT"]
 
 def send(obj):
     omg = json.dumps(obj).encode("utf-8")
     print(omg)
     pub.send(omg)
 
-
 i = 0
+idx = 0
+
 while True:
     # TG пакет
     send({
         "type": "tg",
         "token": random.choice(tokens),
-        "exchange": random.choice(["Binance", "ByBit"]),
+        # "exchange": random.choice(["Binance", "ByBit"]),
+        "exchange": "Binance",
         "openInterest": f"{8 + random.random()*5:.3f}",
         "volume": f"{80 + random.random()*10:.3f}",
         "trades8h": None,
@@ -32,20 +34,24 @@ while True:
         "notificationsCount8h": str(i % 12),
         "ts": time.time(),
     })
-    time.sleep(0.05)
+    time.sleep(0.01)
+
+    #robin round
+    token = tokens[idx]
+    idx = (idx + 1) % len(tokens)
 
     # KLINE пакет (упрощённый)
     send({
         "type": "kline",
-        "token": random.choice(tokens),
+        "token": token,
         "open": 1.0 + random.random()*0.1,
         "high": 1.05 + random.random()*0.1,
         "low": 0.95 + random.random()*0.1,
         "close": 1.0 + random.random()*0.1,
         "volume": 1000 + int(random.random()*500),
-        "MA99": 1.0, "MA163": 1.0, "MA200": 1.0, "MA360": 1.0,
-        "vwap": 1.0,
+        #"MA99": 1.0, "MA163": 1.0, "MA200": 1.0, "MA360": 1.0,
+        #"vwap": 1.0,
         "ts": time.time(),
     })
     i += 1
-    time.sleep(0.05)
+    time.sleep(0.01)

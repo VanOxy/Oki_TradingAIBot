@@ -3,9 +3,9 @@ ENDPOINT = "tcp://127.0.0.1:5555"
 # окна/лимиты
 KLINE_WINDOW = 72
 TG_WINDOW = 10
-MAX_TOKENS = 80
+MAX_TOKENS = 15
 
 # тайминги ожиданий
-STEP_TIMEOUT_SEC = 1          # для mock; в проде поставишь 330-360
-POLL_INTERVAL_MS = 100
-MAX_PUMP_MSGS = 1000           # максимум сообщений за один pump
+STEP_TIMEOUT_SEC = 0.3          # для mock; в проде поставишь 330-360
+POLL_INTERVAL_MS = 100          # для mock; в проде поставишь 1000
+MAX_PUMP_MSGS = 1000            # максимум сообщений за один pump
